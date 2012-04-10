@@ -1,4 +1,4 @@
-module LJAutorespond where
+module Main where
 
 import qualified Text.XML.HXT.XPath as XP
 import qualified Text.XML.HXT.Core as X
@@ -71,7 +71,6 @@ postMessage formData = do
       mkForm formData
       ] :: IO (C.CurlResponse)
     return ()
-
 
 mkForm :: [(String,String)] -> C.CurlOption
 mkForm = C.CurlPostFields . map mkEncoded
