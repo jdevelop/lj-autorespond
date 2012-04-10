@@ -34,7 +34,7 @@ type InputTags = DM.Map String String
 data AppConfig = AppConfig {
   userMapping :: UserMapping,
   fileConfig :: String
-} deriving (Read, Show)
+}  deriving (Show, Read)
 
 appName = "lj-autorespond"
 
@@ -67,7 +67,6 @@ postMessage formData = do
   curl <- C.initialize
   C.withCurlDo $ do
     (C.do_curl_ curl $!) "http://www.livejournal.com/talkpost_do.bml" [
-      C.CurlHttpHeaders ["Accept-Charset : utf-8"],
       C.CurlPost True,
       mkForm formData
       ] :: IO (C.CurlResponse)
@@ -85,6 +84,7 @@ getRandomPhrase :: String -> IO String
 getRandomPhrase fileName = do
   linesArray <- readPhrases fileName
   lineNumber <- randomIO :: IO Int
+  print lineNumber
   return $ linesArray A.! (lineNumber `mod` (succ (snd (A.bounds linesArray))))
 
 readPhrases :: String -> IO (A.Array Int String)
@@ -96,7 +96,7 @@ readPhrases = liftM f . S8.readFile
 processStdIn :: UserMapping -> String -> IO ()
 processStdIn users replies = do
   content <- liftM (head . extractHTMLPart . parse) S8.getContents
-  inputTags <- extractInputTags content :: IO (DM.Map String String)
+  inputTags <- extractInputTags content
   username <- extractUsername content
   check inputTags username
   where
@@ -107,7 +107,7 @@ processStdIn users replies = do
                                  | otherwise = return ()
     post inputTags = do
       body <- getRandomPhrase replies
-      postMessage $ ("body",body) : DM.toList inputTags
+      postMessage $ ("body",body) : (DM.toList $ DM.insert "encoding" "utf8" inputTags)
 
 
 main = do
