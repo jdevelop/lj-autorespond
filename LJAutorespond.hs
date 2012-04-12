@@ -99,11 +99,10 @@ processStdIn users replies = do
   username <- extractUsername content
   check inputTags username
   where
-    check inputTags uname | not $ DM.member uname users = return ()
-                          | otherwise = go inputTags (DM.lookup uname users)
-    go inputTags Nothing = post inputTags
-    go inputTags (Just journals) | DS.member (inputTags  DM.! "journal") journals = post inputTags
-                                 | otherwise = return ()
+    check inputTags = maybe (return ()) (go inputTags) . flip DM.lookup users
+    go inputTags journals | DS.null journals = post inputTags
+                          | DS.member (inputTags  DM.! "journal") journals = post inputTags
+                          | otherwise = return ()
     post inputTags = do
       body <- getRandomPhrase replies
       postMessage $ ("body",body) : (DM.toList $ DM.insert "encoding" "utf8" inputTags)
