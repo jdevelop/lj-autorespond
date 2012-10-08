@@ -11,7 +11,7 @@ import Codec.MIME.String.Types
 import Codec.MIME.String.Headers
 import Codec.MIME.String.Parse
 
-import Codec.Binary.Url as U                                                                                                            
+import Codec.Binary.Url as U
 import Codec.Binary.UTF8.String as US
 
 import qualified System.IO.UTF8 as S8
@@ -24,6 +24,7 @@ import qualified Data.Text as T
 import qualified Data.Set as DS
 import qualified Data.Map as DM
 import Data.List.Split (splitOn)
+import Data.Maybe
 
 import Control.Monad (liftM)
 
@@ -41,25 +42,29 @@ appName = "lj-autorespond"
 getConfigFileName = getAppUserDataDirectory appName
 
 extractHTMLPart :: Message -> [String]
-extractHTMLPart = f . m_message_content 
+extractHTMLPart = f . m_message_content
   where
     f (Mixed (Multipart _ msgs _)) = concatMap extractHTMLPart msgs
     f (Alternative (Multipart _ msgs _)) = concatMap extractHTMLPart msgs
     f (Data _ (ContentType "text" "html" _) _ msg) = [msg]
-    f _ = []
+    f (Body (ContentType "text" "html" _) _ msg) = [msg]
+    f z = []
 
 extractUsername :: String -> IO String
-extractUsername content = head `fmap` (X.runX $
+extractUsername content = headSafe `fmap` (X.runX $
   X.readString [X.withValidate X.no, X.withParseHTML X.yes] content X.>>>
   XP.getXPathTrees "//table/tr/td/a/text()" X.>>>
-  X.deep 
+  X.deep
     ( X.getText ))
+  where
+    headSafe [] = error "No username found"
+    headSafe xs = head xs
 
 extractInputTags :: String -> IO InputTags
 extractInputTags content = (DM.fromList . filter ((/= "subject") . fst)) `fmap` (X.runX $
   X.readString [X.withValidate X.no, X.withParseHTML X.yes] content X.>>>
   XP.getXPathTrees "//form/input" X.>>>
-  X.deep 
+  X.deep
       ( X.isElem X.>>> (X.getAttrValue "name" X.&&& X.getAttrValue "value") ))
 
 postMessage :: [(String,String)] -> IO ()
@@ -112,6 +117,6 @@ main = do
   fileNameFromDir <- getConfigFileName
   fileExists <- doesFileExist fileNameFromDir
   (AppConfig users replies) <- liftM read $ readFile fileNameFromDir
-  if fileExists 
+  if fileExists
     then processStdIn users replies
     else fail $ "Can not read config file " ++ fileNameFromDir
